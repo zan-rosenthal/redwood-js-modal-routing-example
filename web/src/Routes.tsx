@@ -17,11 +17,12 @@ import { ImageDetail } from './pages/ImageDetail'
 
 const Routes = () => {
   const { modal } = useContext(ModalContext)
+  const modalProps = modal.length > 0 ? { wrap: modal } : {}
 
   return (
     <Router>
       <Route path="/" page={Home} name="home" />
-      <Set wrap={modal}>
+      <Set {...modalProps}>
         <Route path="/images/{image}" name="imageDetail" page={ImageDetail} />
       </Set>
       <Route notfound page={NotFoundPage} />
