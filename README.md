@@ -1,5 +1,5 @@
 ## The Problem
-Modal routing isn't possible out of the box with Redwood Router, because it does not allow for nested routes.
+Modal routing isn't possible out of the box with Redwood Router, because it does not allow for nested routes. Modal routing is when a page can open within the context of another page or as an independent route. To see an example, visit https://nomadlist.com/ and click on a city.
 ## Solution
 The router's `<Set>` component allows for multiple parent layouts to wrap the page component for a given route. Using `<Set>` and React Context, we can set a parent page and modal layout around a route when navigating to it from the parent page. When the user visits the same route directly, and no modal context has been set, the `wrap` prop passed to `<Set>` will be empty, and the page component for the route will render without a parent layout.
 
