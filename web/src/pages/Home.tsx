@@ -14,8 +14,7 @@ export const Home = ({ children }) => {
 
   if (loading) return <div>Loading...</div>
 
-  const setModalContext = (image) => {
-    console.log('setting', image)
+  const handleClick = (image) => {
     setModal([Home, ModalLayout])
     navigate(routes.imageDetail({ image }))
   }
@@ -25,7 +24,7 @@ export const Home = ({ children }) => {
       <div id="Home">
         <div className="image-container">
           {images.map((image, index) => (
-            <ImageBox key={index} image={image} handleClick={setModalContext} />
+            <ImageBox key={index} image={image} handleClick={handleClick} />
           ))}
         </div>
         {children}

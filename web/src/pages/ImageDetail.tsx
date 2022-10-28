@@ -4,12 +4,11 @@ import { ImageBox } from 'src/components/ImageBox'
 import { ModalContext } from 'src/contexts/ModalContext'
 
 export const ImageDetail = ({ image }) => {
-  const { modal } = useContext(ModalContext)
-  const noModalSet = !(modal.length > 0)
+  const { modal, isModalSet } = useContext(ModalContext)
 
   return (
     <div className="rw-scaffold">
-      {noModalSet && (
+      {!isModalSet && (
         <header>
           <h1>This header shows outside of modal navigation</h1>
         </header>

@@ -20,7 +20,9 @@ const App = () => {
       <RedwoodProvider titleTemplate="%PageTitle | %AppTitle">
         <RedwoodApolloProvider>
           <ImageContext.Provider value={imageContext}>
-            <ModalContext.Provider value={{ modal, setModal }}>
+            <ModalContext.Provider
+              value={{ modal, setModal, isModalSet: modal.length > 1 }}
+            >
               <Routes />
             </ModalContext.Provider>
           </ImageContext.Provider>

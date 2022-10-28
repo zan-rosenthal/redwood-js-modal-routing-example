@@ -1,121 +1,154 @@
-# README
+## The Problem
+Modal routing isn't possible out of the box with Redwood Router, because it does not allow for nested routes.
+## Solution
+The router's `<Set>` component allows for multiple parent layouts to wrap the page component for a given route. Using `<Set>` and React Context, we can set a parent page and modal layout around a route when navigating to it from the parent page. When the user visits the same route directly, and no modal context has been set, the `wrap` prop passed to `<Set>` will be empty, and the page component for the route will render without a parent layout.
 
-Welcome to [RedwoodJS](https://redwoodjs.com)!
+## Code
 
-> **Prerequisites**
->
-> - Redwood requires [Node.js](https://nodejs.org/en/) (>=14.19.x <=16.x) and [Yarn](https://yarnpkg.com/) (>=1.15)
-> - Are you on Windows? For best results, follow our [Windows development setup](https://redwoodjs.com/docs/how-to/windows-development-setup) guide
+This code renders an image gallery. When an image is clicked on from the home page, some details about that image are rendered in a modal format. If the url for that image is loaded directly, the image detail fills the full page.
 
-Start by installing dependencies:
+Create modal context:
 
-```
-yarn install
-```
+```javascript
+// contexts/ModalContext.tsx
 
-Then change into that directory and start the development server:
-
-```
-cd my-redwood-project
-yarn redwood dev
-```
-
-Your browser should automatically open to http://localhost:8910 where you'll see the Welcome Page, which links out to a ton of great resources.
-
-> **The Redwood CLI**
->
-> Congratulations on running your first Redwood CLI command!
-> From dev to deploy, the CLI is with you the whole way.
-> And there's quite a few commands at your disposal:
-> ```
-> yarn redwood --help
-> ```
-> For all the details, see the [CLI reference](https://redwoodjs.com/docs/cli-commands).
-
-## Prisma and the database
-
-Redwood wouldn't be a full-stack framework without a database. It all starts with the schema. Open the [`schema.prisma`](api/db/schema.prisma) file in `api/db` and replace the `UserExample` model with the following `Post` model:
+export const ModalContext = createContext({
+  modal: [],
+  setModal: () => {},
+  isModalSet: false,
+})
 
 ```
-model Post {
-  id        Int      @id @default(autoincrement())
-  title     String
-  body      String
-  createdAt DateTime @default(now())
+
+Wrap App in the provider:
+
+```javascript
+//src/App.tsx
+
+import { ModalContext } from './contexts/ModalContext'
+import { useModal } from './hooks/useModal'
+
+const App = () => {
+  const { modal, setModal } = useModal()
+
+  return (
+    <FatalErrorBoundary page={FatalErrorPage}>
+      <RedwoodProvider titleTemplate="%PageTitle | %AppTitle">
+        <RedwoodApolloProvider>
+          <ModalContext.Provider
+            value={{ modal, setModal }}
+          >
+            <Routes />
+          </ModalContext.Provider>
+        </RedwoodApolloProvider>
+      </RedwoodProvider>
+    </FatalErrorBoundary>
+  )
+}
+
+...
+```
+
+In our routes file we have two routes, a home page that renders the image gallery and a page for showing detail about a single image. The route for the image detail is wrapped in Redwood Router's Set component. The Set component is passed some optional modal props which can affect what layouts the ImageDetail route gets wrapped in.
+
+```javascript
+// src/Routes.tsx
+
+const Routes = () => {
+  const { modal, isModalSet } = useContext(ModalContext)
+  const modalProps = isModalSet ? { wrap: modal } : {}
+
+  return (
+    <Router>
+      <Route path="/" page={Home} name="home" />
+      <Set {...modalProps}>
+        <Route path="/images/{image}" name="imageDetail" page={ImageDetail} />
+      </Set>
+      <Route notfound page={NotFoundPage} />
+    </Router>
+  )
 }
 ```
 
-Redwood uses [Prisma](https://www.prisma.io/), a next-gen Node.js and TypeScript ORM, to talk to the database. Prisma's schema offers a declarative way of defining your app's data models. And Prisma [Migrate](https://www.prisma.io/migrate) uses that schema to make database migrations hassle-free:
+In our Home page, we fetch some images and render a gallery. If an image is clicked, it sets the modal context, which will get picked up in our routes, and navigates to the image detail page. Because the modal context is set, the image detail will render with the Home and ModalLayout components wrapping it.
 
-```
-yarn rw prisma migrate dev
+```javascript
 
-# ...
+//src/pages/Home.tsx
 
-? Enter a name for the new migration: › create posts
-```
+export const Home = ({ children }) => {
+  const { loading, images } = useFetchImages()
 
-> `rw` is short for `redwood`
+  if(loading) return <div>Loading... </div>
 
-You'll be prompted for the name of your migration. `create posts` will do.
+  const handleClick = (image) => {
+    setModal([Home, ModalLayout])
+    navigate(routes.imageDetail({ image }))
+  }
 
-Now let's generate everything we need to perform all the CRUD (Create, Retrieve, Update, Delete) actions on our `Post` model:
-
-```
-yarn redwood g scaffold post
-```
-
-Navigate to http://localhost:8910/posts/new, fill in the title and body, and click "Save":
-
-Did we just create a post in the database? Yup! With `yarn rw g scaffold <model>`, Redwood created all the pages, components, and services necessary to perform all CRUD actions on our posts table.
-
-## Frontend first with Storybook
-
-Don't know what your data models look like?
-That's more than ok—Redwood integrates Storybook so that you can work on design without worrying about data.
-Mockup, build, and verify your React components, even in complete isolation from the backend:
-
-```
-yarn rw storybook
+  return (
+    <BaseLayout>
+      <div id="Home">
+        <div className="image-container">
+          {images.map((image, index) => (
+            <ImageBox key={index} image={image} handleClick={handleClick} />
+          ))}
+        </div>
+        {children}
+      </div>
+    </BaseLayout>
+  )
+}
 ```
 
-Before you start, see if the CLI's `setup ui` command has your favorite styling library:
+If we stop here, there is one issue for users though. The hook we are using to load images will re-render when we open the image detail in the modal. This is because, it is re-rendering the Home page as part of the route transition. To remedy this, we can move the image fetching logic into its own context independent of the current rout.
+
+```javascript
+// src/contexts/ImageContext
+
+import { Context, createContext } from 'react'
+
+export const ImageContext: Context<{
+  images: string[]
+  loading: boolean
+}> = createContext({
+  images: [],
+  loading: true,
+})
 
 ```
-yarn rw setup ui --help
+
+And then, wrap our App with the ImageContext.Provider and move the hook to fetch the images up to App.tsx:
+
+```javascript
+// src/App.tsx
+
+const App = () => {
+  const modalContext = useModal()
+  const imageContext = useFetchImages()
+
+  return (
+    <FatalErrorBoundary page={FatalErrorPage}>
+      <RedwoodProvider titleTemplate="%PageTitle | %AppTitle">
+        <RedwoodApolloProvider>
+          <ImageContext.Provider value={imageContext}>
+            <ModalContext.Provider
+              value={{ modal, setModal, isModalSet: modal.length > 1 }}
+            >
+              <Routes />
+            </ModalContext.Provider>
+          </ImageContext.Provider>
+        </RedwoodApolloProvider>
+      </RedwoodProvider>
+    </FatalErrorBoundary>
+  )
+}
+
 ```
 
-## Testing with Jest
 
-It'd be hard to scale from side project to startup without a few tests.
-Redwood fully integrates Jest with the front and the backends and makes it easy to keep your whole app covered by generating test files with all your components and services:
+This will allow to access the ImageDetail as both a modal page within a page and as an independent route filling the page. There are two downsides here.
 
-```
-yarn rw test
-```
+1. The component wrapping the modal, in this case Home, needs to be built to render children when it is beign used as part of the layout.
+2. Any application state that could cause the component wrapping the modal to re-render needs to exist independently above the router.
 
-To make the integration even more seamless, Redwood augments Jest with database [scenarios](https://redwoodjs.com/docs/testing.md#scenarios)  and [GraphQL mocking](https://redwoodjs.com/docs/testing.md#mocking-graphql-calls).
-
-## Ship it
-
-Redwood is designed for both serverless deploy targets like Netlify and Vercel and serverful deploy targets like Render and AWS:
-
-```
-yarn rw setup deploy --help
-```
-
-Don't go live without auth!
-Lock down your front and backends with Redwood's built-in, database-backed authentication system ([dbAuth](https://redwoodjs.com/docs/authentication#self-hosted-auth-installation-and-setup)), or integrate with nearly a dozen third party auth providers:
-
-```
-yarn rw setup auth --help
-```
-
-## Next Steps
-
-The best way to learn Redwood is by going through the comprehensive [tutorial](https://redwoodjs.com/docs/tutorial/foreword) and joining the community (via the [Discourse forum](https://community.redwoodjs.com) or the [Discord server](https://discord.gg/redwoodjs)).
-
-## Quick Links
-
-- Stay updated: read [Forum announcements](https://community.redwoodjs.com/c/announcements/5), follow us on [Twitter](https://twitter.com/redwoodjs), and subscribe to the [newsletter](https://redwoodjs.com/newsletter)
-- [Learn how to contribute](https://redwoodjs.com/docs/contributing)
