@@ -21,7 +21,6 @@
   "prisma": {
     "seed": "yarn rw exec seed"
   },
-  "packageManager": "yarn@3.2.3",
   "dependencies": {
     "axios": "^1.1.3"
   }
